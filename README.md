@@ -4,7 +4,7 @@
 
 ## 本地运行
 
-Node.js 22.12 或以上版本：
+Node.js 22.x（建议 22.12 或以上的 22.x 版本）：
 
 ```bash
 npm ci
@@ -42,7 +42,7 @@ npm run dev
 | Framework preset | Vite            |
 | Build command    | `npm run build` |
 | Output directory | `dist`          |
-| Node.js          | 22.x 或更高     |
+| Node.js          | 22.x           |
 | 环境变量         | 无              |
 
 项目已提供 `vercel.json`。也可在此目录运行 `vercel` 创建预览部署。部署不是本地构建的一部分；当前目录不会自动创建远端仓库或发布网站。

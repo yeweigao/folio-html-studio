@@ -9,7 +9,7 @@
   },
   "type": "module",
   "engines": {
-    "node": ">=22.12.0"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
