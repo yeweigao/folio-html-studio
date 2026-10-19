@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Field Notes — A journey in print</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #e8ebf0;
+        color: #172238;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .page {
+        position: relative;
+        width: 794px;
+        height: 1123px;
+        margin: 24px auto;
+        background: white;
+        overflow: hidden;
+        page-break-after: always;
+      }
+      .page:last-child {
+        page-break-after: auto;
+      }
+      .folio {
+        position: absolute;
+        left: 56px;
+        right: 56px;
+        bottom: 42px;
+        display: flex;
+        justify-content: space-between;
+        font: 12px Arial;
+        letter-spacing: 1px;
+      }
+      .small {
+        font-size: 13px;
+        letter-spacing: 2px;
+      }
+      .cover {
+        background: #164be8;
+        color: white;
+      }
+      .cover h1 {
+        position: absolute;
+        left: 54px;
+        top: 112px;
+        font:
+          normal 116px/0.94 Georgia,
+          serif;
+        margin: 0;
+        letter-spacing: -5px;
+      }
+      .cover .intro {
+        position: absolute;
+        left: 58px;
+        top: 390px;
+        width: 400px;
+        font-size: 23px;
+        line-height: 1.4;
+      }
+      .cover .top {
+        position: absolute;
+        left: 58px;
+        top: 52px;
+      }
+      .cover .issue {
+        position: absolute;
+        right: 58px;
+        top: 54px;
+      }
+      .cover img {
+        position: absolute;
+        left: 0;
+        top: 550px;
+        width: 794px;
+        height: 470px;
+        object-fit: cover;
+      }
+      .cover .stamp {
+        position: absolute;
+        right: 46px;
+        top: 470px;
+        width: 128px;
+        height: 128px;
+        background: #d9f45d;
+        color: #142335;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        z-index: 2;
+        font: italic 28px Georgia;
+        transform: rotate(-14deg);
+      }
+      .cover .folio {
+        color: #dce6ff;
+      }
+      h2 {
+        font:
+          normal 62px/1.05 Georgia,
+          serif;
+        letter-spacing: -2px;
+        margin: 0;
+      }
+      .story .eyebrow {
+        position: absolute;
+        left: 58px;
+        top: 58px;
+        color: #164be8;
+      }
+      .story h2 {
+        position: absolute;
+        left: 56px;
+        top: 113px;
+        width: 580px;
+      }
+      .story .lead {
+        position: absolute;
+        left: 58px;
+        top: 276px;
+        width: 630px;
+        font-size: 24px;
+        line-height: 1.45;
+      }
+      .story img {
+        position: absolute;
+        left: 0;
+        top: 422px;
+        width: 794px;
+        height: 350px;
+        object-fit: cover;
+      }
+      .story .column {
+        position: absolute;
+        top: 820px;
+        width: 314px;
+        font-size: 17px;
+        line-height: 1.65;
+        margin: 0;
+      }
+      .story .one {
+        left: 58px;
+      }
+      .story .two {
+        left: 422px;
+      }
+      .schedule h2 {
+        position: absolute;
+        left: 56px;
+        top: 100px;
+        width: 600px;
+      }
+      .schedule .small {
+        position: absolute;
+        left: 58px;
+        top: 55px;
+        color: #164be8;
+      }
+      .schedule .deck {
+        position: absolute;
+        left: 58px;
+        top: 252px;
+        font-size: 21px;
+        width: 620px;
+        line-height: 1.5;
+      }
+      .schedule table {
+        position: absolute;
+        left: 58px;
+        top: 395px;
+        width: 678px;
+        border-collapse: collapse;
+      }
+      td,
+      th {
+        text-align: left;
+        padding: 26px 10px;
+        border-top: 1px solid #b4bfce;
+        vertical-align: top;
+        font-size: 18px;
+        line-height: 1.5;
+      }
+      th {
+        width: 110px;
+        color: #164be8;
+        font-size: 25px;
+      }
+      td strong {
+        display: block;
+        margin-bottom: 8px;
+      }
+      .schedule .note {
+        position: absolute;
+        left: 58px;
+        top: 874px;
+        background: #edf2ff;
+        padding: 24px;
+        width: 678px;
+        font-size: 18px;
+        line-height: 1.5;
+      }
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      @media print {
+        body {
+          background: white;
+        }
+        .page {
+          margin: 0;
+          box-shadow: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="page cover" id="cover">
+      <div class="small top">An independent travel journal</div>
+      <div class="small issue">Volume 01 / 2026</div>
+      <h1>Field<br />Notes.</h1>
+      <p class="intro">A slower journey.<br />A different way of seeing.</p>
+      <div class="stamp">Go explore</div>
+      <img
+        alt="Abstract mountain landscape"
+        src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='900' viewBox='0 0 1600 900'%3E%3Crect width='1600' height='900' fill='%23c8dbe9'/%3E%3Ccircle cx='1190' cy='180' r='94' fill='%23fff4d8'/%3E%3Cpath d='M0 750L450 140 860 700 1250 260 1600 740V900H0Z' fill='%23597d93'/%3E%3Cpath d='M0 900V820L620 390 1080 900Z' fill='%233d6279'/%3E%3Cpath d='M660 900L1180 470 1600 790V900Z' fill='%23224460'/%3E%3Cpath d='M0 810Q500 680 1600 860V900H0Z' fill='%23152840'/%3E%3C/svg%3E"
+      />
+      <footer class="folio">
+        <span>Field Notes / A journey in print</span><span>01</span>
+      </footer>
+    </section>
+    <section class="page story" id="story">
+      <div class="small eyebrow">On the road</div>
+      <h2>Make room<br />for discovery.</h2>
+      <p class="lead">
+        The best part of a journey is often the moment you leave the itinerary
+        behind.
+      </p>
+      <img
+        alt="Abstract landscape in blue"
+        src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='700'%3E%3Crect width='1600' height='700' fill='%23d8e6ef'/%3E%3Cpath d='M0 700L540 70 1050 700Z' fill='%23597d93'/%3E%3Cpath d='M600 700L1200 90 1600 600V700Z' fill='%233a5c78'/%3E%3Cpath d='M0 660Q780 320 1600 620V700H0Z' fill='%231e3d59'/%3E%3C/svg%3E"
+      />
+      <p class="column one">
+        Walk a little further. Ask a different question. Notice the details that
+        rarely make it into a photograph. Every place has a story waiting to be
+        heard.
+      </p>
+      <p class="column two">
+        These pages are a starting point. Change a title, move an image, or make
+        space for your own notes. The next chapter belongs to you.
+      </p>
+      <footer class="folio">
+        <span>Field Notes / Discover</span><span>02</span>
+      </footer>
+    </section>
+    <section class="page schedule" id="plan">
+      <div class="small">The itinerary</div>
+      <h2>Three days.<br />Plenty of possibility.</h2>
+      <p class="deck">
+        A little structure leaves more room for the unexpected. Here is where we
+        begin.
+      </p>
+      <table>
+        <tbody>
+          <tr>
+            <th>Day 1</th>
+            <td>
+              <strong>Arrive &amp; wander</strong>Settle in, find your bearings,
+              and take a walk through the old town.
+            </td>
+          </tr>
+          <tr>
+            <th>Day 2</th>
+            <td>
+              <strong>Learn from the landscape</strong>Spend the morning
+              outdoors. Meet the people who call this place home.
+            </td>
+          </tr>
+          <tr>
+            <th>Day 3</th>
+            <td>
+              <strong>Bring something back</strong>A shared meal, a final
+              conversation, and a few stories worth keeping.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="note">
+        Leave a little space in your plans.<br />Good things rarely arrive on
+        schedule.
+      </p>
+      <footer class="folio">
+        <span>Field Notes / Plan your journey</span><span>03</span>
+      </footer>
+    </section>
+  </body>
+</html>

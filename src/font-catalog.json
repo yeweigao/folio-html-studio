@@ -1,0 +1,245 @@
+[
+  {
+    "id": "inter",
+    "name": "Inter",
+    "family": "Folio Modern Sans",
+    "category": "英文 · 无衬线",
+    "use": "清晰理性，适合瑞士风正文、信息与标签",
+    "license": "OFL-1.1",
+    "licensePath": "/fonts/licenses/inter-OFL.txt",
+    "sourceUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz,wght%5D.ttf",
+    "licenseUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/OFL.txt",
+    "files": [
+      {
+        "weight": 400,
+        "path": "/fonts/inter-400.woff2",
+        "bytes": 113652,
+        "sha256": "72e77e4b9b23373b2e5f5f97f56e3f317233259f32651cc7c61d3937a5af9cb0",
+        "sourceSha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+      },
+      {
+        "weight": 700,
+        "path": "/fonts/inter-700.woff2",
+        "bytes": 117408,
+        "sha256": "18084c0bf421d74f8d4c5ba0d0c9efa4658897c279911ac7f7436c0d07bc4608",
+        "sourceSha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+      }
+    ]
+  },
+  {
+    "id": "source-sans",
+    "name": "Source Sans 3",
+    "family": "Folio Humanist Sans",
+    "category": "英文 · 无衬线",
+    "use": "人文无衬线，适合长文、表格及衬线标题的搭配",
+    "license": "OFL-1.1",
+    "licensePath": "/fonts/licenses/source-sans-OFL.txt",
+    "sourceUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/sourcesans3/SourceSans3%5Bwght%5D.ttf",
+    "licenseUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/sourcesans3/OFL.txt",
+    "files": [
+      {
+        "weight": 400,
+        "path": "/fonts/source-sans-400.woff2",
+        "bytes": 102704,
+        "sha256": "47f986bf9d12abf6640ee45d8ac81f15fc93ac1c5f6ff122acc21a4c9b3dc245",
+        "sourceSha256": "042fe2cc0b933e328410d7acbd0aa6a1873dca5aef81875f4bc214b08825c7b9"
+      },
+      {
+        "weight": 700,
+        "path": "/fonts/source-sans-700.woff2",
+        "bytes": 102528,
+        "sha256": "338e596d33cd60f84010f8f778b7b8752e371d62677df2e2ba692b70cd09811a",
+        "sourceSha256": "042fe2cc0b933e328410d7acbd0aa6a1873dca5aef81875f4bc214b08825c7b9"
+      }
+    ]
+  },
+  {
+    "id": "source-serif",
+    "name": "Source Serif 4",
+    "family": "Folio Editorial Text",
+    "category": "英文 · 衬线",
+    "use": "扎实的编辑式正文，适合杂志、长篇阅读",
+    "license": "OFL-1.1",
+    "licensePath": "/fonts/licenses/source-serif-OFL.txt",
+    "sourceUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/sourceserif4/SourceSerif4%5Bopsz,wght%5D.ttf",
+    "licenseUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/sourceserif4/OFL.txt",
+    "files": [
+      {
+        "weight": 400,
+        "path": "/fonts/source-serif-400.woff2",
+        "bytes": 74740,
+        "sha256": "a70ad9e4a712525d959f5ec81dcbd4d50ced3f9424f6a7dfcb3db36467692806",
+        "sourceSha256": "97b2d4da6e3cb494b5a1e66ae176914d852ccabef49e0c02c0df25f3e39aca0b"
+      },
+      {
+        "weight": 700,
+        "path": "/fonts/source-serif-700.woff2",
+        "bytes": 79816,
+        "sha256": "574f43395e62c2e75dd60033f95bb2268905bc90c829f0c325db08f3ef71be08",
+        "sourceSha256": "97b2d4da6e3cb494b5a1e66ae176914d852ccabef49e0c02c0df25f3e39aca0b"
+      }
+    ]
+  },
+  {
+    "id": "garamond",
+    "name": "EB Garamond",
+    "family": "Folio Classic Book",
+    "category": "英文 · 衬线",
+    "use": "古典书卷气，适合人文画册与书籍正文",
+    "license": "OFL-1.1",
+    "licensePath": "/fonts/licenses/garamond-OFL.txt",
+    "sourceUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/ebgaramond/EBGaramond%5Bwght%5D.ttf",
+    "licenseUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/ebgaramond/OFL.txt",
+    "files": [
+      {
+        "weight": 400,
+        "path": "/fonts/garamond-400.woff2",
+        "bytes": 158312,
+        "sha256": "16b7be3a1f352f35b83ad3708946eec4559c9dc831fb974c0b2fc85947829f0a",
+        "sourceSha256": "ef9512f92f6d579e5dc75af59a5a4b1b8b47d2eda89e00b954d44520e5369027"
+      },
+      {
+        "weight": 700,
+        "path": "/fonts/garamond-700.woff2",
+        "bytes": 176884,
+        "sha256": "fb7a5725bad5b4dae399a4ac3e51eef69ef85df073d124f26cd5d2607400c247",
+        "sourceSha256": "ef9512f92f6d579e5dc75af59a5a4b1b8b47d2eda89e00b954d44520e5369027"
+      }
+    ]
+  },
+  {
+    "id": "playfair",
+    "name": "Playfair Display",
+    "family": "Folio Display Serif",
+    "category": "英文 · 衬线",
+    "use": "高对比展示字体，适合大标题，不建议密集小字",
+    "license": "OFL-1.1",
+    "licensePath": "/fonts/licenses/playfair-OFL.txt",
+    "sourceUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf",
+    "licenseUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/playfairdisplay/OFL.txt",
+    "files": [
+      {
+        "weight": 400,
+        "path": "/fonts/playfair-400.woff2",
+        "bytes": 61836,
+        "sha256": "6fa28547fca884f7a246769e1c0cde5af80bf9cf14bb253d3fffb95548a65270",
+        "sourceSha256": "c40f2293766a503bc70cce9e512ef844a4ccb7cbcde792fe2ea31d191917d8d6"
+      },
+      {
+        "weight": 700,
+        "path": "/fonts/playfair-700.woff2",
+        "bytes": 66712,
+        "sha256": "547860007a3be9f6407ce0f430625fd9003526da1b2b5d97eb716cc10ae2312e",
+        "sourceSha256": "c40f2293766a503bc70cce9e512ef844a4ccb7cbcde792fe2ea31d191917d8d6"
+      }
+    ]
+  },
+  {
+    "id": "baskerville",
+    "name": "Libre Baskerville",
+    "family": "Folio Book Serif",
+    "category": "英文 · 衬线",
+    "use": "开阔稳重，适合中小字号正文与导语",
+    "license": "OFL-1.1",
+    "licensePath": "/fonts/licenses/baskerville-OFL.txt",
+    "sourceUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/librebaskerville/LibreBaskerville%5Bwght%5D.ttf",
+    "licenseUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/librebaskerville/OFL.txt",
+    "files": [
+      {
+        "weight": 400,
+        "path": "/fonts/baskerville-400.woff2",
+        "bytes": 38316,
+        "sha256": "1a64b3aa800df28a5575d0c9a0c84ce6f65ac9c707651d66e7b1cbe0994e896a",
+        "sourceSha256": "05a95421961341c5b2556285e8415df9db27dab4f4abe22b446b3c6a8b916c5d"
+      },
+      {
+        "weight": 700,
+        "path": "/fonts/baskerville-700.woff2",
+        "bytes": 39440,
+        "sha256": "7c03d9595c9a4b740a1c4c649979ca95fcde3a7ba3bee31f58d31fdc9a3df4c5",
+        "sourceSha256": "05a95421961341c5b2556285e8415df9db27dab4f4abe22b446b3c6a8b916c5d"
+      }
+    ]
+  },
+  {
+    "id": "noto-sans-sc",
+    "name": "思源黑体 · Noto Sans SC",
+    "family": "Folio CJK Sans",
+    "category": "中文",
+    "use": "中性清晰，适合正文、信息页及现代画册",
+    "license": "OFL-1.1",
+    "licensePath": "/fonts/licenses/noto-sans-sc-OFL.txt",
+    "sourceUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf",
+    "licenseUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/OFL.txt",
+    "files": [
+      {
+        "weight": 400,
+        "path": "/fonts/noto-sans-sc-400.woff2",
+        "bytes": 4193152,
+        "sha256": "23dd42a553061c7f1f1d8cb66cfd8954aee2f2c3ebdb7adf108db44924579d10",
+        "sourceSha256": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da"
+      },
+      {
+        "weight": 700,
+        "path": "/fonts/noto-sans-sc-700.woff2",
+        "bytes": 4314372,
+        "sha256": "90529ae0aa60c091dc44ed61f08f1908d6e5637c59e8e25e093d40e9b48015f1",
+        "sourceSha256": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da"
+      }
+    ]
+  },
+  {
+    "id": "noto-serif-sc",
+    "name": "思源宋体 · Noto Serif SC",
+    "family": "Folio CJK Serif",
+    "category": "中文",
+    "use": "端正细腻，适合出版正文、人文画册与标题",
+    "license": "OFL-1.1",
+    "licensePath": "/fonts/licenses/noto-serif-sc-OFL.txt",
+    "sourceUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf",
+    "licenseUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/OFL.txt",
+    "files": [
+      {
+        "weight": 400,
+        "path": "/fonts/noto-serif-sc-400.woff2",
+        "bytes": 5733132,
+        "sha256": "3c201d00b80223660b0b0abc100fc3fa973ecd83e547004e4a1adc706ca595c4",
+        "sourceSha256": "050080d9255a86808f2945bffac582b31ef32bc36411ce29563b4961670c66f9"
+      },
+      {
+        "weight": 700,
+        "path": "/fonts/noto-serif-sc-700.woff2",
+        "bytes": 5924832,
+        "sha256": "582b1d3cb72573cd959e883599ba6207f9752b57712bc2183a380bbd398fff94",
+        "sourceSha256": "050080d9255a86808f2945bffac582b31ef32bc36411ce29563b4961670c66f9"
+      }
+    ]
+  },
+  {
+    "id": "wenkai",
+    "name": "霞鹜文楷 GB",
+    "family": "Folio Literary Kai",
+    "category": "中文",
+    "use": "温润书写感，适合人文叙述、引言与注释",
+    "license": "OFL-1.1",
+    "licensePath": "/fonts/licenses/wenkai-OFL.txt",
+    "sourceUrl": "https://github.com/lxgw/LxgwWenkaiGB/releases/latest/download/LXGWWenKaiGB-Regular.ttf",
+    "licenseUrl": "https://raw.githubusercontent.com/lxgw/LxgwWenkaiGB/main/OFL.txt",
+    "files": [
+      {
+        "weight": 400,
+        "path": "/fonts/wenkai-400.woff2",
+        "bytes": 8039200,
+        "sha256": "773d55f59bbbe14f8f6c96d7380604e54b20f0715f2a1820950c4039b33eec57",
+        "sourceSha256": "5561d48097d92e5ab99fe7b1459d381bbcdff533bfc479207b089c6860c3990e"
+      },
+      {
+        "weight": 700,
+        "path": "/fonts/wenkai-700.woff2",
+        "bytes": 9236652,
+        "sha256": "135d270765c1299cf0968a962c5fdc6cc87a0abaa0cc2fcfec30cfd033888c3f",
+        "sourceSha256": "6d30174e433f33c582f6dc2e221aea0d53ca70f2f6ee12929bb60577bb24cc73"
+      }
+    ]
+  }
+]
