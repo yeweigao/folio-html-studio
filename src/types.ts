@@ -21,6 +21,7 @@ export type Selection = {
   fontSize: number;
   lineHeight: number;
   fontFamily: string;
+  fontWeight: number;
   color: string;
   background: string;
   align: string;
@@ -28,6 +29,7 @@ export type Selection = {
   wrapSupport: { pretty: boolean; balance: boolean };
   bold: boolean;
   italic: boolean;
+  underline: boolean;
   letterSpacing: number;
   kind: "text" | "image" | "graphic" | "shape";
   originalFont: string;
@@ -48,6 +50,12 @@ export type Selection = {
   } | null;
 };
 export type HandbookSource = { build: string; lang: string | null; title: string | null };
+export type PageBackground = {
+  id: string;
+  label: string;
+  opacity: number;
+  fit: "cover" | "contain";
+};
 export type EditorState = {
   source: HandbookSource | null;
   pages: PageInfo[];
@@ -55,6 +63,8 @@ export type EditorState = {
   selection: Selection | null;
   objects: { id: string; label: string; tag: string; kind: string }[];
   documentFonts: { family: string; embedded: boolean }[];
+  documentColors: string[];
+  background: PageBackground | null;
   undo: boolean;
   redo: boolean;
   warnings: number;

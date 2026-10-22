@@ -22,10 +22,12 @@
     style;
   let nodeSequence = 0,
     savedTimer;
+  let backgroundTransaction = false;
   const pageSizes = new Map();
   const documentFonts = new Map();
   let sharedRules = [];
   let graphicTransaction = false;
+  let documentColors = [];
   try {
     sharedRules = JSON.parse(
       document.getElementById("folio-shared-styles")?.dataset.rules || "[]",
@@ -90,6 +92,57 @@
             .join("")
       : "#ffffff";
   };
+  const parseCssColor = (value) => {
+    const match = value.match(/rgba?\(([^)]+)\)/i);
+    if (!match) return null;
+    const parts = match[1].replace(/,/g, " ").replace(/\//g, " ").trim().split(/\s+/);
+    if (parts.length < 3) return null;
+    const channel = (part) => {
+      const number = Number.parseFloat(part);
+      return Number.isFinite(number)
+        ? Math.max(0, Math.min(255, Math.round(part.includes("%") ? number * 2.55 : number)))
+        : 0;
+    };
+    const rgb = parts.slice(0, 3).map(channel);
+    const alpha = parts[3] ? Number.parseFloat(parts[3]) * (parts[3].includes("%") ? 0.01 : 1) : 1;
+    return { rgb, alpha: Number.isFinite(alpha) ? alpha : 1 };
+  };
+  const scanDocumentColors = () => {
+    const scores = new Map();
+    const add = (cssValue, weight) => {
+      const values = cssValue.match(/rgba?\([^)]+\)/gi) || [];
+      values.forEach((value) => {
+        const parsed = parseCssColor(value);
+        if (!parsed || parsed.alpha < 0.16) return;
+        const [red, green, blue] = parsed.rgb;
+        const maximum = Math.max(red, green, blue),
+          minimum = Math.min(red, green, blue);
+        const saturation = maximum === 0 ? 0 : (maximum - minimum) / maximum;
+        if (saturation < 0.12 || maximum > 247 || maximum < 22) return;
+        const hex = `#${parsed.rgb.map((part) => part.toString(16).padStart(2, "0")).join("")}`;
+        scores.set(hex, (scores.get(hex) || 0) + weight * parsed.alpha);
+      });
+    };
+    pages.forEach((page) => {
+      [page, ...page.querySelectorAll("*")].forEach((el) => {
+        if (!(el instanceof HTMLElement || el instanceof SVGElement) || skip(el)) return;
+        const computed = getComputedStyle(el);
+        if (computed.display === "none" || computed.visibility === "hidden" || Number(computed.opacity) === 0) return;
+        add(computed.backgroundColor, 2.4);
+        add(computed.color, 0.75);
+        add(computed.borderTopColor, 0.24);
+        add(computed.backgroundImage, 0.45);
+        if (el instanceof SVGElement) {
+          add(computed.fill, 1.1);
+          add(computed.stroke, 0.6);
+        }
+      });
+    });
+    return [...scores.entries()]
+      .sort((first, second) => second[1] - first[1])
+      .slice(0, 8)
+      .map(([color]) => color);
+  };
   const pageFor = (el) => pages.find((p) => p === el || p.contains(el));
   const ruleData = (el) => {
     try {
@@ -97,6 +150,179 @@
     } catch {
       return {};
     }
+  };
+  const backgroundProperties = [
+    "background-image",
+    "background-size",
+    "background-position",
+    "background-repeat",
+  ];
+  const readBackground = (page) => {
+    try {
+      return JSON.parse(page.dataset.folioBackground || "null");
+    } catch {
+      return null;
+    }
+  };
+  const backgroundInfo = (page) => {
+    const value = page && readBackground(page);
+    if (!value) return null;
+    const opacity = Number(value.opacity ?? 30);
+    return {
+      id: value.id || "custom",
+      label: value.label || "页面底纹",
+      opacity: Math.round(Number.isFinite(opacity) ? Math.max(0, Math.min(100, opacity)) : 30),
+      fit: value.fit === "contain" ? "contain" : "cover",
+    };
+  };
+  const cssLayers = (value) => {
+    const layers = [];
+    let start = 0,
+      depth = 0,
+      quote = "";
+    for (let i = 0; i < value.length; i++) {
+      const char = value[i];
+      if (quote) {
+        if (char === "\\") i++;
+        else if (char === quote) quote = "";
+        continue;
+      }
+      if (char === "'" || char === '"') quote = char;
+      else if (char === "(") depth++;
+      else if (char === ")") depth--;
+      else if (char === "," && depth === 0) {
+        layers.push(value.slice(start, i).trim());
+        start = i + 1;
+      }
+    }
+    const last = value.slice(start).trim();
+    if (last) layers.push(last);
+    return layers;
+  };
+  const captureBackgroundStyles = (page) =>
+    Object.fromEntries(
+      backgroundProperties.map((property) => [
+        property,
+        {
+          value: page.style.getPropertyValue(property),
+          priority: page.style.getPropertyPriority(property),
+        },
+      ]),
+    );
+  const setBackgroundStyle = (page, property, value) =>
+    page.style.setProperty(property, value, "important");
+  const backgroundUrl = (source) => `url("${source}")`;
+  const xmlEscape = (value) =>
+    value
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;");
+  const imageLayer = (source, opacity, page) => {
+    const rect = page.getBoundingClientRect(),
+      size = pageSizes.get(page) || {
+        width: rect.width || 794,
+        height: rect.height || 1123,
+      },
+      ratio = Math.max(0.1, Math.min(5, size.width / size.height));
+    const width = 1000,
+      height = Math.round(width / ratio),
+      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" data-folio-background-layer="1"><image x="0" y="0" width="${width}" height="${height}" href="${xmlEscape(source)}" preserveAspectRatio="xMidYMid slice" opacity="${Math.max(0, Math.min(100, opacity)) / 100}"/></svg>`;
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  };
+  const updateLayerOpacity = (url, opacity) => {
+    const comma = url.indexOf(",");
+    if (!url.startsWith("data:image/svg+xml") || comma < 0) return url;
+    try {
+      const svg = decodeURIComponent(url.slice(comma + 1));
+      if (!svg.includes('data-folio-background-layer="1"')) return url;
+      const updated = svg.replace(
+        /(<image\b[^>]*\bopacity=")[^"]*(")/,
+        `$1${Math.max(0, Math.min(100, opacity)) / 100}$2`,
+      );
+      return `${url.slice(0, comma + 1)}${encodeURIComponent(updated)}`;
+    } catch {
+      return url;
+    }
+  };
+  const firstBackgroundUrl = (value) => {
+    const match = value.match(/url\((?:"([^"]*)"|'([^']*)'|([^)]*))\)/i);
+    return match ? match[1] || match[2] || match[3].trim() : "";
+  };
+  const applyPageBackground = (page, value) => {
+    const previous = readBackground(page),
+      original = previous?.original || captureBackgroundStyles(page),
+      computed = getComputedStyle(page),
+      currentImages = previous
+        ? cssLayers(page.style.getPropertyValue("background-image")).slice(1)
+        : computed.backgroundImage === "none"
+          ? []
+          : cssLayers(computed.backgroundImage),
+      currentSizes = previous
+        ? cssLayers(page.style.getPropertyValue("background-size")).slice(1)
+        : computed.backgroundImage === "none"
+          ? []
+          : cssLayers(computed.backgroundSize),
+      currentPositions = previous
+        ? cssLayers(page.style.getPropertyValue("background-position")).slice(1)
+        : computed.backgroundImage === "none"
+          ? []
+          : cssLayers(computed.backgroundPosition),
+      currentRepeats = previous
+        ? cssLayers(page.style.getPropertyValue("background-repeat")).slice(1)
+        : computed.backgroundImage === "none"
+          ? []
+          : cssLayers(computed.backgroundRepeat),
+      opacity = Math.max(0, Math.min(100, Number(value.opacity ?? 30)));
+    const source = imageLayer(value.src, opacity, page),
+      images = [backgroundUrl(source), ...currentImages],
+      sizes = [value.fit === "contain" ? "contain" : "cover", ...currentSizes],
+      positions = ["center", ...currentPositions],
+      repeats = ["no-repeat", ...currentRepeats];
+    setBackgroundStyle(page, "background-image", images.join(", "));
+    setBackgroundStyle(page, "background-size", sizes.join(", "));
+    setBackgroundStyle(page, "background-position", positions.join(", "));
+    setBackgroundStyle(page, "background-repeat", repeats.join(", "));
+    page.dataset.folioBackground = JSON.stringify({
+      id: value.id || "custom",
+      label: value.label || "页面底纹",
+      opacity,
+      fit: value.fit === "contain" ? "contain" : "cover",
+      original,
+    });
+  };
+  const updatePageBackground = (page, patch) => {
+    const background = readBackground(page);
+    if (!background) return;
+    if (patch.opacity !== undefined) {
+      const layers = cssLayers(page.style.getPropertyValue("background-image"));
+      const source = updateLayerOpacity(
+        firstBackgroundUrl(layers[0] || ""),
+        patch.opacity,
+      );
+      if (source) {
+        layers[0] = backgroundUrl(source);
+        setBackgroundStyle(page, "background-image", layers.join(", "));
+      }
+      background.opacity = Math.max(0, Math.min(100, Number(patch.opacity)));
+    }
+    if (patch.fit !== undefined) {
+      const layers = cssLayers(page.style.getPropertyValue("background-size"));
+      layers[0] = patch.fit === "contain" ? "contain" : "cover";
+      setBackgroundStyle(page, "background-size", layers.join(", "));
+      background.fit = patch.fit === "contain" ? "contain" : "cover";
+    }
+    page.dataset.folioBackground = JSON.stringify(background);
+  };
+  const removePageBackground = (page) => {
+    const background = readBackground(page);
+    if (!background) return;
+    backgroundProperties.forEach((property) => {
+      const original = background.original?.[property];
+      if (original?.value)
+        page.style.setProperty(property, original.value, original.priority || "");
+      else page.style.removeProperty(property);
+    });
+    delete page.dataset.folioBackground;
   };
   const serialize = () => {
     const doc = document.documentElement.cloneNode(true);
@@ -289,6 +515,13 @@
       cs = getComputedStyle(target);
     return candidates.filter((el) => {
       if (kindOf(el) !== kind) return false;
+      if (scope === "page-heading" || scope === "book-heading")
+        return (
+          kind === "text" &&
+          /^H[1-6]$/.test(target.tagName) &&
+          el.tagName === target.tagName &&
+          (scope === "book-heading" || pageFor(el) === pageFor(target))
+        );
       if (scope === "page-style" || scope === "book-style")
         return (
           el.dataset.folioStyle === target.dataset.folioStyle &&
@@ -332,6 +565,12 @@
         ? [
             ["book-font", "全册同字体"],
             ["book-size", "全册同字号"],
+            ...(/^H[1-6]$/.test(selected.tagName)
+              ? [
+                  ["page-heading", "本页同级标题"],
+                  ["book-heading", "全册同级标题"],
+                ]
+              : []),
           ]
         : []),
     ].map(([id, label]) => {
@@ -351,6 +590,7 @@
     "font-size",
     "font-weight",
     "font-style",
+    "text-decoration-line",
     "line-height",
     "letter-spacing",
     "color",
@@ -642,6 +882,7 @@
       fontSize: parseFloat(cs.fontSize),
       lineHeight: parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2,
       fontFamily: cs.fontFamily,
+      fontWeight: Number.parseFloat(cs.fontWeight) || (cs.fontWeight === "bold" ? 700 : 400),
       color: rgbaToHex(cs.color),
       background: rgbaToHex(cs.backgroundColor),
       align: cs.textAlign,
@@ -652,6 +893,7 @@
       },
       bold: parseInt(cs.fontWeight) >= 600 || cs.fontWeight === "bold",
       italic: cs.fontStyle === "italic",
+      underline: cs.textDecorationLine.split(/\s+/).includes("underline"),
       letterSpacing: parseFloat(cs.letterSpacing) || 0,
       kind: kindOf(selected),
       originalFont: originalData(selected).fontFamily || cs.fontFamily,
@@ -743,6 +985,8 @@
         redo: redo.length > 0,
         warnings: warningCount(),
         documentFonts: [...documentFonts.values()],
+        documentColors,
+        background: backgroundInfo(pages[pageIndex]),
       },
     });
   const updateOutline = () => {
@@ -883,6 +1127,7 @@
     handle = document.getElementById("folio-handle");
     pageInfo();
     assignNodes();
+    documentColors = scanDocumentColors();
     rebuildRules();
     showPage(0);
     send("ready");
@@ -1144,6 +1389,55 @@
     if (action === "endGraphic") {
       graphicTransaction = false;
       commit();
+    }
+    if (action === "beginBackground") {
+      checkpoint();
+      backgroundTransaction = true;
+    }
+    if (action === "endBackground") {
+      backgroundTransaction = false;
+      commit();
+    }
+    if (action === "background" && pages.length) {
+      const mode = value?.mode || "apply",
+        targets = value?.scope === "all" ? pages : [pages[pageIndex]];
+      if (mode === "apply") {
+        const source = value?.background?.src;
+        if (
+          typeof source !== "string" ||
+          !/^data:image\/(?:svg\+xml|png|jpe?g|webp|gif)(?:;|,)/i.test(source) ||
+          source.length > 20 * 1024 * 1024
+        ) {
+          send("error", { message: "底纹图片格式不支持，或文件超过 15 MB。" });
+        } else {
+          if (!backgroundTransaction) checkpoint();
+          targets.forEach((page) =>
+            applyPageBackground(page, value.background),
+          );
+          commit();
+        }
+      } else if (
+        (mode === "opacity" || mode === "fit") &&
+        targets.some((page) => readBackground(page))
+      ) {
+        if (!backgroundTransaction) checkpoint();
+        targets.forEach((page) =>
+          updatePageBackground(
+            page,
+            mode === "opacity"
+              ? { opacity: value.opacity }
+              : { fit: value.fit },
+          ),
+        );
+        commit();
+      } else if (
+        mode === "remove" &&
+        targets.some((page) => readBackground(page))
+      ) {
+        checkpoint();
+        targets.forEach(removePageBackground);
+        commit();
+      }
     }
     if (action === "replaceSvg" && selected instanceof SVGSVGElement) {
       try {

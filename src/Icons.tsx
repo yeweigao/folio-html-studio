@@ -15,6 +15,8 @@ export type IconName =
   | "check"
   | "close"
   | "help"
+  | "sparkles"
+  | "eyedropper"
   | "arrow"
   | "reset"
   | "align-left"
@@ -80,6 +82,19 @@ const paths: Record<IconName, ReactNode> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M9 9a3 3 0 1 1 5 2c-2 1-2 1-2 3m0 3h.01" />
+    </>
+  ),
+  sparkles: (
+    <>
+      <path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Z" />
+      <path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15ZM5 3l.6 1.4L7 5l-1.4.6L5 7l-.6-1.4L3 5l1.4-.6L5 3Z" />
+    </>
+  ),
+  eyedropper: (
+    <>
+      <path d="m14.5 6.5 3 3" />
+      <path d="m4 20 5.5-1 9.2-9.2a2.1 2.1 0 0 0-3-3L6.5 16 4 20Z" />
+      <path d="m12 8 4 4" />
     </>
   ),
   arrow: (
