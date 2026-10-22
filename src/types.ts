@@ -60,8 +60,9 @@ export type LayoutGridInfo = {
   visible: boolean;
   columns: number;
   lines: number;
-  source: "css-grid" | "inferred";
+  source: "css-grid" | "typographic";
   rhythm: number;
+  gutter: number;
 };
 export type EditorState = {
   source: HandbookSource | null;

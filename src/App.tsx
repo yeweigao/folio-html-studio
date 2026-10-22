@@ -622,7 +622,9 @@ export default function App() {
       : `${grid.lines} 条参考线`
     : "布局网格";
   const gridTitle = grid
-    ? `${grid.visible ? "隐藏" : "显示"} ${gridLabel}${grid.rhythm ? ` · ${grid.rhythm}px 节奏` : ""}`
+    ? `${grid.visible ? "隐藏" : "显示"} ${gridLabel}${
+        grid.gutter ? ` · ${grid.gutter}px 栏间` : ""
+      }${grid.rhythm ? ` · ${grid.rhythm}px 基线` : ""}`
     : "布局网格";
   const showFloatingToolbar =
     !!selection && selection.kind === "text" && !loading && tab !== "background";

@@ -1005,110 +1005,157 @@
         pageFor(el) === page &&
         !el.parentElement?.closest("[data-folio-id]"),
     );
-  const readCssGrid = (page) => {
-    const origin = page.getBoundingClientRect(),
-      pageWidth = origin.width;
-    let best = null;
-    [page, ...page.querySelectorAll("*")].forEach((el) => {
-      if (!(el instanceof HTMLElement)) return;
-      const cs = getComputedStyle(el);
-      if (!cs.display.includes("grid")) return;
-      const widths = cs.gridTemplateColumns
-        .split(/\s+/)
-        .map((track) => Number.parseFloat(track))
-        .filter((width) => Number.isFinite(width) && width > 0);
-      if (widths.length < 2) return;
-      const rect = el.getBoundingClientRect();
-      if (rect.width < pageWidth * 0.5 || rect.height < 16) return;
-      const gapValue = Number.parseFloat(cs.columnGap);
-      const gap = Number.isFinite(gapValue) ? gapValue : 0;
-      const borderLeft = Number.parseFloat(cs.borderLeftWidth) || 0,
-        borderRight = Number.parseFloat(cs.borderRightWidth) || 0,
-        paddingLeft = Number.parseFloat(cs.paddingLeft) || 0,
-        paddingRight = Number.parseFloat(cs.paddingRight) || 0;
-      const available =
-        rect.width -
-        borderLeft -
-        borderRight -
-        paddingLeft -
-        paddingRight;
-      const used =
-        widths.reduce((sum, width) => sum + width, 0) +
-        gap * (widths.length - 1);
-      if (available <= 0 || used > available + 3) return;
-      let x =
-        rect.left - origin.left + borderLeft + paddingLeft;
-      const columns = widths.map((width) => {
-        const column = { start: x, end: x + width };
-        x += width + gap;
-        return column;
-      });
-      const start = columns[0].start,
-        end = columns[columns.length - 1].end;
-      if (start < -2 || end > pageWidth + 2) return;
-      const score =
-        widths.length * 1000000 + rect.width * 100 + rect.height;
-      if (!best || score > best.score)
-        best = {
-          score,
-          columns,
-          gap,
-          marginLeft: start,
-          marginRight: pageWidth - end,
-          source: "css-grid",
-        };
-    });
-    return best;
+  const gridTracks = (el) => {
+    const cs = getComputedStyle(el);
+    if (!cs.display.includes("grid")) return null;
+    const widths = cs.gridTemplateColumns
+      .split(/\s+/)
+      .map((track) => Number.parseFloat(track))
+      .filter((width) => Number.isFinite(width) && width > 0);
+    if (widths.length < 2 || widths.length > 8) return null;
+    const rect = el.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const gapValue = Number.parseFloat(cs.columnGap);
+    const gap = Number.isFinite(gapValue) ? gapValue : 0;
+    const borderLeft = Number.parseFloat(cs.borderLeftWidth) || 0,
+      borderRight = Number.parseFloat(cs.borderRightWidth) || 0,
+      paddingLeft = Number.parseFloat(cs.paddingLeft) || 0,
+      paddingRight = Number.parseFloat(cs.paddingRight) || 0;
+    const available =
+      rect.width - borderLeft - borderRight - paddingLeft - paddingRight;
+    const used =
+      widths.reduce((sum, width) => sum + width, 0) +
+      gap * (widths.length - 1);
+    if (available <= 0 || used > available + 3) return null;
+    const scale = available / used;
+    return {
+      widths: widths.map((width) => width * scale),
+      gap: gap * scale,
+      rect,
+      inset: borderLeft + paddingLeft,
+    };
   };
-  const readInferredGrid = (blocks, pageWidth) => {
+  const readContentMargins = (entries) => {
     const lefts = [],
-      rights = [],
-      edges = [];
-    blocks.forEach((block) => {
-      if (
-        block.width < 3 ||
-        block.height < 3 ||
-        (block.width >= pageWidth * 0.9 && block.height >= 40)
-      )
-        return;
-      if (block.left > 1 && block.left < pageWidth * 0.45)
-        lefts.push(block.left);
-      const fromRight = pageWidth - block.right;
-      if (fromRight > 1 && fromRight < pageWidth * 0.45)
-        rights.push(fromRight);
-      if (block.left > 1 && block.left < pageWidth - 1)
-        edges.push(block.left);
-      if (block.right > 1 && block.right < pageWidth - 1)
-        edges.push(block.right);
+      rights = [];
+    entries.forEach(({ page, rect }) => {
+      if (!rect.width) return;
+      [...page.children].forEach((el) => {
+        if (!(el instanceof HTMLElement)) return;
+        const block = el.getBoundingClientRect();
+        if (block.width < 8 || block.height < 8) return;
+        const left = block.left - rect.left,
+          right = rect.right - block.right;
+        if (left > 1 && left < rect.width * 0.35) lefts.push(left);
+        if (right > 1 && right < rect.width * 0.35) rights.push(right);
+      });
     });
-    const pickMargin = (values, fallback) => {
+    const fallback = Math.round((entries[0]?.rect.width || 794) * 0.07);
+    const pick = (values) => {
       const cluster = clusterEdges(values).sort(
         (a, b) => b.count - a.count || a.value - b.value,
       )[0];
-      return cluster && cluster.count >= 2 ? cluster.value : fallback;
+      return cluster ? cluster.value : null;
     };
-    const fallback = Math.min(48, Math.round(pageWidth * 0.06));
-    const marginLeft = pickMargin(lefts, fallback),
-      marginRight = pickMargin(rights, fallback);
-    return {
-      columns: [],
-      gap: 0,
-      marginLeft,
-      marginRight,
-      lines: uniqueEdges([
-        marginLeft,
-        pageWidth - marginRight,
-        ...clusterEdges(edges)
-          .filter((cluster) => cluster.count >= 2)
-          .map((cluster) => cluster.value),
-      ]).filter((x) => x > 0.5 && x < pageWidth - 0.5),
-      source: "inferred",
+    let left = pick(lefts),
+      right = pick(rights);
+    if (left == null && right == null) left = right = fallback;
+    else if (left == null) left = right;
+    else if (right == null) right = left;
+    return { left, right };
+  };
+  const readPageGrid = (entries) => {
+    const found = [];
+    entries.forEach(({ page, rect }) => {
+      const pageWidth = rect.width,
+        pageHeight = rect.height;
+      if (!pageWidth || !pageHeight) return;
+      [...page.querySelectorAll("*")].forEach((el) => {
+        if (!(el instanceof HTMLElement)) return;
+        const template = gridTracks(el);
+        if (!template) return;
+        const grid = template.rect;
+        if (grid.width < pageWidth * 0.78) return;
+        const left = grid.left - rect.left,
+          right = rect.right - grid.right;
+        if (left < 0 || right < 0) return;
+        if (left > pageWidth * 0.3 || right > pageWidth * 0.3) return;
+        const direct = el.parentElement === page;
+        const named = /(^|[-_ ])(?:ed-grid|layout-grid|page-grid)(?:$|[-_ ])/.test(
+          String(el.className),
+        );
+        if (!direct && !named) return;
+        // Layout grids are modular: equal tracks. Content tables have mixed
+        // widths and must not redefine the page grid.
+        if (
+          Math.max(...template.widths) - Math.min(...template.widths) >
+          Math.max(2, template.widths[0] * 0.04)
+        )
+          return;
+        if (direct && !named && grid.height < pageHeight * 0.25) return;
+        let x = left + template.inset;
+        const columns = template.widths.map((width) => {
+          const column = { start: x, end: x + width };
+          x += width + template.gap;
+          return column;
+        });
+        const start = columns[0].start,
+          end = columns[columns.length - 1].end;
+        if (start < -2 || end > pageWidth + 2) return;
+        found.push({
+          page,
+          pageWidth,
+          columns,
+          gap: template.gap,
+          marginLeft: start,
+          marginRight: pageWidth - end,
+          direct,
+          named,
+          area: grid.width * grid.height,
+          signature: `${columns.length}:${Math.round(template.gap)}:${Math.round(
+            start,
+          )}:${Math.round(pageWidth - end)}`,
+        });
+      });
+    });
+    if (!found.length) return null;
+    const groups = new Map();
+    found.forEach((item) => {
+      const group = groups.get(item.signature) || {
+        items: [],
+        pages: new Set(),
+      };
+      group.items.push(item);
+      group.pages.add(item.page);
+      groups.set(item.signature, group);
+    });
+    const group = [...groups.values()].sort(
+      (a, b) =>
+        b.pages.size - a.pages.size ||
+        b.items.length - a.items.length ||
+        Number(b.items.some((item) => item.named)) -
+          Number(a.items.some((item) => item.named)) ||
+        Math.max(...b.items.map((item) => item.area)) -
+          Math.max(...a.items.map((item) => item.area)),
+    )[0];
+    return group.items.sort(
+      (a, b) => Number(b.direct) - Number(a.direct) || b.area - a.area,
+    )[0];
+  };
+  const readGridVars = () => {
+    const cs = getComputedStyle(document.body);
+    const read = (name) => {
+      const value = Number.parseFloat(cs.getPropertyValue(name));
+      return Number.isFinite(value) ? value : 0;
     };
+    return { gutter: read("--gut"), rhythm: read("--lh") };
   };
   const readRhythm = (blocks) => {
     const scores = new Map();
     blocks.forEach(({ el }) => {
       if (kindOf(el) !== "text") return;
+      const rect = el.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
       const cs = getComputedStyle(el),
         size = Number.parseFloat(cs.fontSize),
         height = Number.parseFloat(cs.lineHeight);
@@ -1122,48 +1169,86 @@
     return best && best[1] >= 2 ? best[0] : 0;
   };
   const buildLayoutGrid = () => {
-    const entries = pages.map((page) => {
-      const rect = page.getBoundingClientRect();
-      return {
-        page,
-        rect,
-        blocks: candidateBlocks(page).map((el) => ({
-          el,
-          ...rectInPage(el, page),
-        })),
-      };
-    });
-    const baseWidth = entries[0]?.rect.width || 794;
-    const blocks = entries.flatMap((entry) => entry.blocks);
-    const explicit = entries
-      .map((entry) => readCssGrid(entry.page))
-      .filter(Boolean)
-      .sort((a, b) => b.score - a.score)[0];
-    const grid = explicit || readInferredGrid(blocks, baseWidth);
-    const lines = explicit
-      ? uniqueEdges(
-          explicit.columns.flatMap((column) => [
-            column.start,
-            column.end,
-          ]),
-        )
-      : grid.lines;
-    const rhythm = readRhythm(blocks);
+    const entries = pages.map((page) => ({
+      page,
+      rect: page.getBoundingClientRect(),
+    }));
+    const visible = entries.filter((entry) => entry.rect.width > 0);
+    if (!visible.length) {
+      layoutGrids = [];
+      return;
+    }
+    const baseWidth = visible[0].rect.width;
+    const margins = readContentMargins(visible);
+    const explicit = readPageGrid(visible);
+    const vars = readGridVars();
+    const rhythm =
+      vars.rhythm >= 8 && vars.rhythm <= 56
+        ? Math.round(vars.rhythm)
+        : readRhythm(
+            visible.flatMap(({ page }) =>
+              candidates
+                .filter((el) => pageFor(el) === page)
+                .map((el) => ({ el })),
+            ),
+          );
     layoutGrids = entries.map(({ rect }) => {
-      const scale = (rect.width || baseWidth) / baseWidth;
+      const width = rect.width || baseWidth,
+        scale = width / baseWidth,
+        height = rect.height || Math.round(baseWidth * 1.414);
+      if (explicit) {
+        const gridScale = width / explicit.pageWidth;
+        return {
+          width,
+          height,
+          columns: explicit.columns.map((column) => ({
+            start: column.start * gridScale,
+            end: column.end * gridScale,
+          })),
+          lines: uniqueEdges(
+            explicit.columns.flatMap((column) => [column.start, column.end]),
+          ).map((x) => x * gridScale),
+          marginLeft: explicit.marginLeft * gridScale,
+          marginRight: explicit.marginRight * gridScale,
+          gutter: explicit.gap * gridScale,
+          rhythm: rhythm ? Math.max(0, Math.round(rhythm * gridScale)) : 0,
+          source: "css-grid",
+        };
+      }
+      const marginLeft = Math.min(margins.left * scale, width * 0.4),
+        marginRight = Math.min(margins.right * scale, width * 0.4),
+        contentWidth = Math.max(0, width - marginLeft - marginRight),
+        gutter = Math.max(
+          0,
+          (vars.gutter || 32 * (baseWidth / 794)) * scale,
+        );
+      let count = 6;
+      while (
+        count > 2 &&
+        (contentWidth - (count - 1) * gutter) / count < 14
+      )
+        count--;
+      const columnWidth = Math.max(
+        0,
+        (contentWidth - (count - 1) * gutter) / count,
+      );
+      const columns = [];
+      for (let index = 0; index < count; index++) {
+        const start = marginLeft + index * (columnWidth + gutter);
+        columns.push({ start, end: start + columnWidth });
+      }
       return {
-        width: rect.width || baseWidth,
-        height: rect.height,
-        columns: (grid.columns || []).map((column) => ({
-          start: column.start * scale,
-          end: column.end * scale,
-        })),
-        lines: lines.map((x) => x * scale),
-        marginLeft: grid.marginLeft * scale,
-        marginRight: grid.marginRight * scale,
-        gutter: grid.gap * scale,
+        width,
+        height,
+        columns,
+        lines: uniqueEdges(
+          columns.flatMap((column) => [column.start, column.end]),
+        ),
+        marginLeft,
+        marginRight,
+        gutter,
         rhythm: rhythm ? Math.max(0, Math.round(rhythm * scale)) : 0,
-        source: grid.source,
+        source: "typographic",
       };
     });
   };
@@ -1176,6 +1261,7 @@
       lines: grid.lines.length,
       source: grid.source,
       rhythm: grid.rhythm,
+      gutter: Math.round(grid.gutter),
     };
   };
   const gridSvg = (parts) =>
@@ -1206,14 +1292,14 @@
         `<rect data-folio-grid-column="" x="${column.start}" y="0" width="${Math.max(
           0,
           column.end - column.start,
-        )}" height="${height}" fill="#ff4d7d" fill-opacity=".025"/>`,
+        )}" height="${height}" fill="#ff4d7d" fill-opacity=".03"/>`,
       );
     });
     const rhythmParts = [];
     if (grid.rhythm >= 8 && grid.rhythm <= 48)
       for (let y = grid.rhythm; y < height; y += grid.rhythm)
         rhythmParts.push(
-          `<path d="M0 ${y}H${width}" stroke="#164be8" stroke-opacity=".035"/>`,
+          `<path d="M0 ${y}H${width}" stroke="#164be8" stroke-opacity=".06"/>`,
         );
     const lineParts = [];
     if (grid.columns.length)
@@ -1221,19 +1307,19 @@
         grid.columns.flatMap((column) => [column.start, column.end]),
       ).forEach((x) =>
         lineParts.push(
-          `<path d="M${x} 0V${height}" stroke="#ff4d7d" stroke-opacity=".13"/>`,
+          `<path d="M${x} 0V${height}" stroke="#ff4d7d" stroke-opacity=".17"/>`,
         ),
       );
     else
       grid.lines.forEach((x) =>
         lineParts.push(
-          `<path d="M${x} 0V${height}" stroke="#ff4d7d" stroke-opacity=".15"/>`,
+          `<path d="M${x} 0V${height}" stroke="#ff4d7d" stroke-opacity=".18"/>`,
         ),
       );
     parts.push(
       ...rhythmParts,
       ...lineParts,
-      `<path d="M${grid.marginLeft} 0V${height}M${width - grid.marginRight} 0V${height}" stroke="#ff4d7d" stroke-opacity=".22" stroke-dasharray="3 3"/>`,
+      `<path d="M${grid.marginLeft} 0V${height}M${width - grid.marginRight} 0V${height}" stroke="#ff4d7d" stroke-opacity=".26" stroke-dasharray="3 3"/>`,
     );
     gridLayer.innerHTML = gridSvg(parts);
   };
