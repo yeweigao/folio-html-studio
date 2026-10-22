@@ -19,10 +19,14 @@
     outline,
     handle,
     label,
-    style;
+    style,
+    gridLayer,
+    guideLayer;
   let nodeSequence = 0,
     savedTimer;
   let backgroundTransaction = false;
+  let layoutGrids = [],
+    gridVisible = true;
   const pageSizes = new Map();
   const documentFonts = new Map();
   let sharedRules = [];
@@ -952,6 +956,447 @@
       });
     return n;
   };
+  // ---- Layout grid and snapping ------------------------------------------
+  const snapDistance = 7;
+  const baseGrid = 4;
+  const edgeTolerance = 4;
+  const clusterEdges = (values) => {
+    const clusters = [];
+    [...values]
+      .filter(Number.isFinite)
+      .sort((a, b) => a - b)
+      .forEach((value) => {
+        const last = clusters[clusters.length - 1];
+        if (last && value - last.max <= edgeTolerance) {
+          last.sum += value;
+          last.max = value;
+          last.count++;
+          last.value = last.sum / last.count;
+        } else clusters.push({ value, sum: value, max: value, count: 1 });
+      });
+    return clusters;
+  };
+  const uniqueEdges = (values) => {
+    const out = [];
+    [...values]
+      .filter(Number.isFinite)
+      .sort((a, b) => a - b)
+      .forEach((value) => {
+        if (!out.length || value - out[out.length - 1] > 0.6)
+          out.push(value);
+      });
+    return out;
+  };
+  const rectInPage = (el, page) => {
+    const rect = el.getBoundingClientRect(),
+      origin = page.getBoundingClientRect();
+    return {
+      left: rect.left - origin.left,
+      top: rect.top - origin.top,
+      right: rect.right - origin.left,
+      bottom: rect.bottom - origin.top,
+      width: rect.width,
+      height: rect.height,
+    };
+  };
+  const candidateBlocks = (page) =>
+    candidates.filter(
+      (el) =>
+        pageFor(el) === page &&
+        !el.parentElement?.closest("[data-folio-id]"),
+    );
+  const readCssGrid = (page) => {
+    const origin = page.getBoundingClientRect(),
+      pageWidth = origin.width;
+    let best = null;
+    [page, ...page.querySelectorAll("*")].forEach((el) => {
+      if (!(el instanceof HTMLElement)) return;
+      const cs = getComputedStyle(el);
+      if (!cs.display.includes("grid")) return;
+      const widths = cs.gridTemplateColumns
+        .split(/\s+/)
+        .map((track) => Number.parseFloat(track))
+        .filter((width) => Number.isFinite(width) && width > 0);
+      if (widths.length < 2) return;
+      const rect = el.getBoundingClientRect();
+      if (rect.width < pageWidth * 0.5 || rect.height < 16) return;
+      const gapValue = Number.parseFloat(cs.columnGap);
+      const gap = Number.isFinite(gapValue) ? gapValue : 0;
+      const borderLeft = Number.parseFloat(cs.borderLeftWidth) || 0,
+        borderRight = Number.parseFloat(cs.borderRightWidth) || 0,
+        paddingLeft = Number.parseFloat(cs.paddingLeft) || 0,
+        paddingRight = Number.parseFloat(cs.paddingRight) || 0;
+      const available =
+        rect.width -
+        borderLeft -
+        borderRight -
+        paddingLeft -
+        paddingRight;
+      const used =
+        widths.reduce((sum, width) => sum + width, 0) +
+        gap * (widths.length - 1);
+      if (available <= 0 || used > available + 3) return;
+      let x =
+        rect.left - origin.left + borderLeft + paddingLeft;
+      const columns = widths.map((width) => {
+        const column = { start: x, end: x + width };
+        x += width + gap;
+        return column;
+      });
+      const start = columns[0].start,
+        end = columns[columns.length - 1].end;
+      if (start < -2 || end > pageWidth + 2) return;
+      const score =
+        widths.length * 1000000 + rect.width * 100 + rect.height;
+      if (!best || score > best.score)
+        best = {
+          score,
+          columns,
+          gap,
+          marginLeft: start,
+          marginRight: pageWidth - end,
+          source: "css-grid",
+        };
+    });
+    return best;
+  };
+  const readInferredGrid = (blocks, pageWidth) => {
+    const lefts = [],
+      rights = [],
+      edges = [];
+    blocks.forEach((block) => {
+      if (
+        block.width < 3 ||
+        block.height < 3 ||
+        (block.width >= pageWidth * 0.9 && block.height >= 40)
+      )
+        return;
+      if (block.left > 1 && block.left < pageWidth * 0.45)
+        lefts.push(block.left);
+      const fromRight = pageWidth - block.right;
+      if (fromRight > 1 && fromRight < pageWidth * 0.45)
+        rights.push(fromRight);
+      if (block.left > 1 && block.left < pageWidth - 1)
+        edges.push(block.left);
+      if (block.right > 1 && block.right < pageWidth - 1)
+        edges.push(block.right);
+    });
+    const pickMargin = (values, fallback) => {
+      const cluster = clusterEdges(values).sort(
+        (a, b) => b.count - a.count || a.value - b.value,
+      )[0];
+      return cluster && cluster.count >= 2 ? cluster.value : fallback;
+    };
+    const fallback = Math.min(48, Math.round(pageWidth * 0.06));
+    const marginLeft = pickMargin(lefts, fallback),
+      marginRight = pickMargin(rights, fallback);
+    return {
+      columns: [],
+      gap: 0,
+      marginLeft,
+      marginRight,
+      lines: uniqueEdges([
+        marginLeft,
+        pageWidth - marginRight,
+        ...clusterEdges(edges)
+          .filter((cluster) => cluster.count >= 2)
+          .map((cluster) => cluster.value),
+      ]).filter((x) => x > 0.5 && x < pageWidth - 0.5),
+      source: "inferred",
+    };
+  };
+  const readRhythm = (blocks) => {
+    const scores = new Map();
+    blocks.forEach(({ el }) => {
+      if (kindOf(el) !== "text") return;
+      const cs = getComputedStyle(el),
+        size = Number.parseFloat(cs.fontSize),
+        height = Number.parseFloat(cs.lineHeight);
+      if (!Number.isFinite(height) || height < 8 || height > 56) return;
+      const value = Math.round(height);
+      scores.set(value, (scores.get(value) || 0) + (size <= 30 ? 2 : 1));
+    });
+    const best = [...scores.entries()].sort(
+      (a, b) => b[1] - a[1] || a[0] - b[0],
+    )[0];
+    return best && best[1] >= 2 ? best[0] : 0;
+  };
+  const buildLayoutGrid = () => {
+    const entries = pages.map((page) => {
+      const rect = page.getBoundingClientRect();
+      return {
+        page,
+        rect,
+        blocks: candidateBlocks(page).map((el) => ({
+          el,
+          ...rectInPage(el, page),
+        })),
+      };
+    });
+    const baseWidth = entries[0]?.rect.width || 794;
+    const blocks = entries.flatMap((entry) => entry.blocks);
+    const explicit = entries
+      .map((entry) => readCssGrid(entry.page))
+      .filter(Boolean)
+      .sort((a, b) => b.score - a.score)[0];
+    const grid = explicit || readInferredGrid(blocks, baseWidth);
+    const lines = explicit
+      ? uniqueEdges(
+          explicit.columns.flatMap((column) => [
+            column.start,
+            column.end,
+          ]),
+        )
+      : grid.lines;
+    const rhythm = readRhythm(blocks);
+    layoutGrids = entries.map(({ rect }) => {
+      const scale = (rect.width || baseWidth) / baseWidth;
+      return {
+        width: rect.width || baseWidth,
+        height: rect.height,
+        columns: (grid.columns || []).map((column) => ({
+          start: column.start * scale,
+          end: column.end * scale,
+        })),
+        lines: lines.map((x) => x * scale),
+        marginLeft: grid.marginLeft * scale,
+        marginRight: grid.marginRight * scale,
+        gutter: grid.gap * scale,
+        rhythm: rhythm ? Math.max(0, Math.round(rhythm * scale)) : 0,
+        source: grid.source,
+      };
+    });
+  };
+  const gridInfo = () => {
+    const grid = layoutGrids[pageIndex];
+    if (!grid) return null;
+    return {
+      visible: gridVisible,
+      columns: grid.columns.length,
+      lines: grid.lines.length,
+      source: grid.source,
+      rhythm: grid.rhythm,
+    };
+  };
+  const gridSvg = (parts) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" aria-hidden="true">${parts.join("")}</svg>`;
+  const renderGrid = () => {
+    if (!gridLayer) return;
+    const page = pages[pageIndex],
+      grid = layoutGrids[pageIndex];
+    if (!gridVisible || !page || !grid) {
+      gridLayer.hidden = true;
+      return;
+    }
+    const rect = page.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      gridLayer.hidden = true;
+      return;
+    }
+    gridLayer.hidden = false;
+    gridLayer.style.left = `${rect.left}px`;
+    gridLayer.style.top = `${rect.top}px`;
+    gridLayer.style.width = `${rect.width}px`;
+    gridLayer.style.height = `${rect.height}px`;
+    const width = rect.width,
+      height = rect.height,
+      parts = [];
+    grid.columns.forEach((column) => {
+      parts.push(
+        `<rect data-folio-grid-column="" x="${column.start}" y="0" width="${Math.max(
+          0,
+          column.end - column.start,
+        )}" height="${height}" fill="#ff4d7d" fill-opacity=".025"/>`,
+      );
+    });
+    const rhythmParts = [];
+    if (grid.rhythm >= 8 && grid.rhythm <= 48)
+      for (let y = grid.rhythm; y < height; y += grid.rhythm)
+        rhythmParts.push(
+          `<path d="M0 ${y}H${width}" stroke="#164be8" stroke-opacity=".035"/>`,
+        );
+    const lineParts = [];
+    if (grid.columns.length)
+      uniqueEdges(
+        grid.columns.flatMap((column) => [column.start, column.end]),
+      ).forEach((x) =>
+        lineParts.push(
+          `<path d="M${x} 0V${height}" stroke="#ff4d7d" stroke-opacity=".13"/>`,
+        ),
+      );
+    else
+      grid.lines.forEach((x) =>
+        lineParts.push(
+          `<path d="M${x} 0V${height}" stroke="#ff4d7d" stroke-opacity=".15"/>`,
+        ),
+      );
+    parts.push(
+      ...rhythmParts,
+      ...lineParts,
+      `<path d="M${grid.marginLeft} 0V${height}M${width - grid.marginRight} 0V${height}" stroke="#ff4d7d" stroke-opacity=".22" stroke-dasharray="3 3"/>`,
+    );
+    gridLayer.innerHTML = gridSvg(parts);
+  };
+  const snapPriority = { element: 0, grid: 1, page: 2 };
+  const buildSnapLines = (page, excluded) => {
+    const rect = page.getBoundingClientRect(),
+      x = [
+        { axis: "x", position: 0, kind: "page" },
+        { axis: "x", position: rect.width / 2, kind: "page" },
+        { axis: "x", position: rect.width, kind: "page" },
+      ],
+      y = [
+        { axis: "y", position: 0, kind: "page" },
+        { axis: "y", position: rect.height / 2, kind: "page" },
+        { axis: "y", position: rect.height, kind: "page" },
+      ];
+    const grid = layoutGrids[pageIndex];
+    if (grid && gridVisible) {
+      grid.lines.forEach((position) =>
+        x.push({ axis: "x", position, kind: "grid" }),
+      );
+      if (grid.rhythm >= 8 && grid.rhythm <= 48)
+        for (let position = grid.rhythm; position < rect.height; position += grid.rhythm)
+          y.push({ axis: "y", position, kind: "grid" });
+    }
+    candidateBlocks(page).forEach((el) => {
+      if (
+        el === excluded ||
+        excluded?.contains(el) ||
+        (el.contains(excluded) && el !== excluded)
+      )
+        return;
+      const block = rectInPage(el, page);
+      if (block.width < 2 || block.height < 2) return;
+      [block.left, block.left + block.width / 2, block.right].forEach(
+        (position) => {
+          if (position < 0 || position > rect.width) return;
+          x.push({
+            axis: "x",
+            position,
+            kind: "element",
+            rect: block,
+          });
+        },
+      );
+      [block.top, block.top + block.height / 2, block.bottom].forEach(
+        (position) => {
+          if (position < 0 || position > rect.height) return;
+          y.push({
+            axis: "y",
+            position,
+            kind: "element",
+            rect: block,
+          });
+        },
+      );
+    });
+    const compact = (lines) => {
+      const map = new Map();
+      lines.forEach((line) => {
+        const key = Math.round(line.position * 2);
+        const current = map.get(key);
+        if (
+          !current ||
+          snapPriority[line.kind] < snapPriority[current.kind]
+        )
+          map.set(key, line);
+      });
+      return [...map.values()].sort(
+        (a, b) => a.position - b.position,
+      );
+    };
+    return { x: compact(x), y: compact(y) };
+  };
+  const findSnap = (anchors, lines, skipGridCenter = false) => {
+    let best = null;
+    anchors.forEach((value, index) => {
+      lines.forEach((line) => {
+        if (
+          skipGridCenter &&
+          index === 1 &&
+          anchors.length === 3 &&
+          line.kind === "grid"
+        )
+          return;
+        const delta = line.position - value,
+          distance = Math.abs(delta);
+        if (distance > snapDistance) return;
+        if (
+          !best ||
+          distance < Math.abs(best.delta) - 0.01 ||
+          (Math.abs(distance - Math.abs(best.delta)) < 0.01 &&
+            snapPriority[line.kind] < snapPriority[best.line.kind])
+        )
+          best = { delta, line };
+      });
+    });
+    return best;
+  };
+  const clearGuides = () => {
+    if (!guideLayer) return;
+    guideLayer.hidden = true;
+    guideLayer.replaceChildren();
+  };
+  const renderGuides = (lines, target, pageRect) => {
+    if (!guideLayer) return;
+    if (!lines.length) {
+      clearGuides();
+      return;
+    }
+    const parts = [];
+    lines.forEach((line) => {
+      const color = line.kind === "page" ? "#164be8" : "#ff3b6b",
+        opacity = line.kind === "element" ? 0.92 : 0.66,
+        strokeWidth = line.kind === "element" ? 1.5 : 1,
+        dash = line.kind === "element" ? "" : ' stroke-dasharray="3 3"';
+      if (line.axis === "x") {
+        let from = 0,
+          to = pageRect.height;
+        if (line.rect) {
+          from = Math.max(
+            0,
+            Math.min(target.top, line.rect.top) - 12,
+          );
+          to = Math.min(
+            pageRect.height,
+            Math.max(
+              target.top + target.height,
+              line.rect.top + line.rect.height,
+            ) + 12,
+          );
+        }
+        parts.push(
+          `<path data-folio-guide="" d="M${pageRect.left + line.position} ${
+            pageRect.top + from
+          }V${pageRect.top + to}" stroke="${color}" stroke-width="${strokeWidth}" stroke-opacity="${opacity}"${dash}/>`,
+        );
+      } else {
+        let from = 0,
+          to = pageRect.width;
+        if (line.rect) {
+          from = Math.max(
+            0,
+            Math.min(target.left, line.rect.left) - 12,
+          );
+          to = Math.min(
+            pageRect.width,
+            Math.max(
+              target.left + target.width,
+              line.rect.left + line.rect.width,
+            ) + 12,
+          );
+        }
+        parts.push(
+          `<path data-folio-guide="" d="M${pageRect.left + from} ${
+            pageRect.top + line.position
+          }H${pageRect.left + to}" stroke="${color}" stroke-width="${strokeWidth}" stroke-opacity="${opacity}"${dash}/>`,
+        );
+      }
+    });
+    guideLayer.hidden = false;
+    guideLayer.innerHTML = gridSvg(parts);
+  };
   // handbook-designer 编辑包：读取构建标记；判断所选对象能否按 ID 写回手册源文件。
   const hbSource = () => {
     const meta = (name) =>
@@ -987,6 +1432,7 @@
         documentFonts: [...documentFonts.values()],
         documentColors,
         background: backgroundInfo(pages[pageIndex]),
+        grid: gridInfo(),
       },
     });
   const updateOutline = () => {
@@ -1003,6 +1449,7 @@
   const select = (el) => {
     finishText();
     selected = el;
+    clearGuides();
     updateOutline();
     emitState();
   };
@@ -1017,7 +1464,9 @@
     document.body.style.margin = "0";
     document.body.style.padding = "0";
     window.scrollTo(0, 0);
+    clearGuides();
     updateOutline();
+    renderGrid();
     emitState();
   };
   function finishText() {
@@ -1068,7 +1517,9 @@
     checkpoint();
     const cs = getComputedStyle(selected),
       d = ruleData(selected),
-      r = selected.getBoundingClientRect();
+      r = selected.getBoundingClientRect(),
+      page = pageFor(selected),
+      p = page.getBoundingClientRect();
     drag = {
       x: event.clientX,
       y: event.clientY,
@@ -1076,6 +1527,13 @@
       dy: d.dy || 0,
       width: r.width,
       height: r.height,
+      startLeft: r.left - p.left,
+      startTop: r.top - p.top,
+      snapLines: buildSnapLines(page, selected),
+      lastDx: d.dx || 0,
+      lastDy: d.dy || 0,
+      lastW: Math.round(r.width),
+      lastH: Math.round(r.height),
       baseTransform:
         d.baseTransform ?? (cs.transform === "none" ? "" : cs.transform),
       resize,
@@ -1116,6 +1574,8 @@
     style.textContent = `html{scrollbar-width:none}body{display:block!important;min-width:0!important}[data-folio-hidden]{display:none!important}.page{margin:0!important;flex-shrink:0!important} [data-folio-editing]{outline:2px solid #164be8!important;cursor:text!important;user-select:text!important} [data-folio-runtime="overlay"]{position:fixed;inset:0;z-index:2147483646;pointer-events:none} #folio-outline{border:2px solid #164be8;box-sizing:border-box;pointer-events:none} #folio-outline:before,#folio-outline:after{content:'';position:absolute;width:7px;height:7px;background:white;border:1.5px solid #164be8;top:-5px} #folio-outline:before{left:-5px} #folio-outline:after{right:-5px} #folio-handle{position:absolute;right:-6px;bottom:-6px;width:10px;height:10px;background:white;border:2px solid #164be8;pointer-events:auto;cursor:nwse-resize;touch-action:none} #folio-size{position:absolute;bottom:-26px;left:0;white-space:nowrap;padding:3px 5px;background:#164be8;color:white;font:11px/1.2 system-ui;letter-spacing:0} @media print{[data-folio-runtime]{display:none!important}[data-folio-hidden]{display:block!important}.page{margin:0!important;box-shadow:none!important}body{margin:0!important;padding:0!important}}`;
     style.textContent +=
       ".cn-brand-graphic .cn-brand-ink path,.cn-brand-graphic .cn-brand-ink rect,.cn-brand-graphic .cn-brand-ink polygon,.cn-brand-graphic .cn-brand-ink line{pointer-events:visiblePainted!important}";
+    style.textContent +=
+      "#folio-grid{position:absolute;overflow:hidden;pointer-events:none} #folio-guides{position:absolute;inset:0;pointer-events:none} #folio-grid svg,#folio-guides svg{display:block;width:100%;height:100%}";
     document.head.append(style);
     overlay = document.createElement("div");
     overlay.setAttribute(runtimeId, "overlay");
@@ -1125,8 +1585,19 @@
     outline = overlay.firstElementChild;
     label = document.getElementById("folio-size");
     handle = document.getElementById("folio-handle");
+    gridLayer = document.createElement("div");
+    gridLayer.id = "folio-grid";
+    gridLayer.setAttribute(runtimeId, "grid");
+    gridLayer.hidden = true;
+    overlay.prepend(gridLayer);
+    guideLayer = document.createElement("div");
+    guideLayer.id = "folio-guides";
+    guideLayer.setAttribute(runtimeId, "guides");
+    guideLayer.hidden = true;
+    overlay.append(guideLayer);
     pageInfo();
     assignNodes();
+    buildLayoutGrid();
     documentColors = scanDocumentColors();
     rebuildRules();
     showPage(0);
@@ -1169,33 +1640,102 @@
         dy = e.clientY - drag.y;
       if (Math.abs(dx) + Math.abs(dy) < 2 && !drag.moved) return;
       drag.moved = true;
+      const page = pageFor(selected),
+        p = page.getBoundingClientRect(),
+        guides = [];
+      let target;
       if (drag.resize) {
-        const w = Math.max(20, Math.round(drag.width + dx));
-        const h = Math.max(16, Math.round(drag.height + dy));
-        apply(selected, {
-          styles: {
-            width: `${w}px`,
-            height: `${h}px`,
-            "box-sizing": "border-box",
-            "max-width": "none",
-          },
-        });
+        let right = drag.startLeft + drag.width + dx,
+          bottom = drag.startTop + drag.height + dy;
+        if (!e.altKey) {
+          const xSnap = findSnap([right], drag.snapLines.x);
+          const ySnap = findSnap([bottom], drag.snapLines.y);
+          if (xSnap) {
+            right += xSnap.delta;
+            guides.push({ ...xSnap.line, axis: "x" });
+          } else right = Math.round(right / baseGrid) * baseGrid;
+          if (ySnap) {
+            bottom += ySnap.delta;
+            guides.push({ ...ySnap.line, axis: "y" });
+          } else bottom = Math.round(bottom / baseGrid) * baseGrid;
+        }
+        const w = Math.max(
+            20,
+            Math.round(right - drag.startLeft),
+          ),
+          h = Math.max(
+            16,
+            Math.round(bottom - drag.startTop),
+          );
+        target = {
+          left: drag.startLeft,
+          top: drag.startTop,
+          width: w,
+          height: h,
+        };
+        if (w !== drag.lastW || h !== drag.lastH) {
+          apply(selected, {
+            styles: {
+              width: `${w}px`,
+              height: `${h}px`,
+              "box-sizing": "border-box",
+              "max-width": "none",
+            },
+          });
+          drag.lastW = w;
+          drag.lastH = h;
+        }
       } else {
-        const snap = e.altKey
-          ? (v) => Math.round(v)
-          : (v) => Math.round(v / 4) * 4;
-        apply(selected, {
-          dx: snap(drag.dx + dx),
-          dy: snap(drag.dy + dy),
-          baseTransform: drag.baseTransform,
-        });
+        let left = drag.startLeft + dx,
+          top = drag.startTop + dy;
+        if (!e.altKey) {
+          const xSnap = findSnap(
+            [left, left + drag.width / 2, left + drag.width],
+            drag.snapLines.x,
+          );
+          const ySnap = findSnap(
+            [top, top + drag.height / 2, top + drag.height],
+            drag.snapLines.y,
+            true,
+          );
+          if (xSnap) {
+            left += xSnap.delta;
+            guides.push({ ...xSnap.line, axis: "x" });
+          } else left = Math.round(left / baseGrid) * baseGrid;
+          if (ySnap) {
+            top += ySnap.delta;
+            guides.push({ ...ySnap.line, axis: "y" });
+          } else top = Math.round(top / baseGrid) * baseGrid;
+        }
+        target = {
+          left,
+          top,
+          width: drag.width,
+          height: drag.height,
+        };
+        const nextDx = drag.dx + (left - drag.startLeft),
+          nextDy = drag.dy + (top - drag.startTop);
+        if (
+          nextDx !== drag.lastDx ||
+          nextDy !== drag.lastDy
+        ) {
+          apply(selected, {
+            dx: nextDx,
+            dy: nextDy,
+            baseTransform: drag.baseTransform,
+          });
+          drag.lastDx = nextDx;
+          drag.lastDy = nextDy;
+        }
       }
+      renderGuides(guides, target, p);
       updateOutline();
     });
     const endDrag = () => {
       if (!drag) return;
       if (!drag.moved) undo.pop();
       drag = null;
+      clearGuides();
       commit();
     };
     document.addEventListener("pointerup", endDrag);
@@ -1253,8 +1793,12 @@
         commit();
       }
     });
-    window.addEventListener("scroll", updateOutline);
-    window.addEventListener("resize", updateOutline);
+    const syncOverlay = () => {
+      updateOutline();
+      renderGrid();
+    };
+    window.addEventListener("scroll", syncOverlay);
+    window.addEventListener("resize", syncOverlay);
     window.addEventListener("blur", finishText);
   };
   const history = (direction) => {
@@ -1274,6 +1818,12 @@
       return;
     const { action, value } = e.data;
     if (action === "page") showPage(value);
+    if (action === "grid") {
+      gridVisible = Boolean(value);
+      renderGrid();
+      clearGuides();
+      emitState();
+    }
     if (action === "select")
       select(candidates.find((el) => el.dataset.folioId === value) || null);
     if (action === "editText") startText();

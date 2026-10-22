@@ -56,6 +56,13 @@ export type PageBackground = {
   opacity: number;
   fit: "cover" | "contain";
 };
+export type LayoutGridInfo = {
+  visible: boolean;
+  columns: number;
+  lines: number;
+  source: "css-grid" | "inferred";
+  rhythm: number;
+};
 export type EditorState = {
   source: HandbookSource | null;
   pages: PageInfo[];
@@ -65,6 +72,7 @@ export type EditorState = {
   documentFonts: { family: string; embedded: boolean }[];
   documentColors: string[];
   background: PageBackground | null;
+  grid: LayoutGridInfo | null;
   undo: boolean;
   redo: boolean;
   warnings: number;

@@ -244,6 +244,10 @@ p {
   background: #eaf0f9;
   color: #182238;
 }
+.icon-button.active {
+  background: #eaf0ff;
+  color: var(--blue);
+}
 .workbench {
   display: grid;
   grid-template-columns: var(--nav-width) minmax(0, 1fr) var(--inspector-width);

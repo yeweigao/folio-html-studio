@@ -31,6 +31,7 @@ const emptyState: EditorState = {
   documentFonts: [],
   documentColors: [],
   background: null,
+  grid: null,
 };
 // 编辑包里不能按 ID 写回手册源文件的修改类型
 function untraceable(selection: Selection): string[] {
@@ -48,17 +49,20 @@ function ToolButton({
   title,
   onClick,
   disabled = false,
+  active,
 }: {
   icon: IconName;
   title: string;
   onClick: () => void;
   disabled?: boolean;
+  active?: boolean;
 }) {
   return (
     <button
-      className="icon-button"
+      className={`icon-button${active ? " active" : ""}`}
       aria-label={title}
       title={title}
+      aria-pressed={active}
       onClick={onClick}
       disabled={disabled}
     >
@@ -611,6 +615,15 @@ export default function App() {
     );
   const currentW = page?.width || 794,
     currentH = page?.height || 1123;
+  const grid = state.grid;
+  const gridLabel = grid
+    ? grid.columns
+      ? `${grid.columns} 栏网格`
+      : `${grid.lines} 条参考线`
+    : "布局网格";
+  const gridTitle = grid
+    ? `${grid.visible ? "隐藏" : "显示"} ${gridLabel}${grid.rhythm ? ` · ${grid.rhythm}px 节奏` : ""}`
+    : "布局网格";
   const showFloatingToolbar =
     !!selection && selection.kind === "text" && !loading && tab !== "background";
   const typographyScopes = selection?.scopes.filter(
@@ -1124,6 +1137,13 @@ export default function App() {
               />
               <span className="toolbar-divider" />
               <ToolButton
+                icon="grid"
+                title={gridTitle}
+                active={grid?.visible}
+                disabled={loading || !grid}
+                onClick={() => command("grid", !(grid?.visible ?? true))}
+              />
+              <ToolButton
                 icon="print"
                 title="打印 / 另存为 PDF"
                 onClick={() => {
@@ -1367,7 +1387,13 @@ export default function App() {
             <span className={state.warnings ? "warning-status" : ""}>
               {state.warnings
                 ? `${state.warnings} 个对象可能超出页面，请检查`
-                : "按住 Alt 拖动可关闭网格吸附"}
+                : grid
+                  ? grid.visible
+                    ? grid.columns
+                      ? `拖动吸附到 ${gridLabel} 与对象边缘 · Alt 自由移动`
+                      : `拖动吸附到${gridLabel}与对象边缘 · Alt 自由移动`
+                    : "对象对齐吸附开启 · Alt 自由移动"
+                  : "按住 Alt 拖动可关闭网格吸附"}
             </span>
           </footer>
         </main>
@@ -2029,8 +2055,7 @@ export default function App() {
             </p>
             <ul>
               <li>
-                点选后拖动移动，右下角手柄调整尺寸。默认按 4 px 吸附，Alt
-                可临时关闭。
+                编辑时会从文档提取布局网格，并显示列线与页边距。拖动、缩放会吸附到网格和附近对象的边缘、中线，出现对齐线；按住 Alt 可临时自由移动。
               </li>
               <li>
                 双击文字直接修改，点击画布外或按 Esc
