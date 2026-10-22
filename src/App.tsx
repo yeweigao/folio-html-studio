@@ -11,6 +11,7 @@ import FontPicker from "./FontPicker";
 import { printFonts, fontCss } from "./fonts";
 
 const emptyState: EditorState = {
+  source: null,
   pages: [],
   page: 0,
   selection: null,
@@ -20,6 +21,17 @@ const emptyState: EditorState = {
   warnings: 0,
   documentFonts: [],
 };
+// 编辑包里不能按 ID 写回手册源文件的修改类型
+function untraceable(selection: Selection): string[] {
+  const out: string[] = [];
+  if (selection.kind === "text" && !selection.traceable.text)
+    out.push("这段文字没有内容 ID，改字不会写回");
+  if (selection.image && !selection.traceable.image)
+    out.push("这张图片没有编辑 ID，换图不会写回");
+  if (!selection.traceable.style)
+    out.push("这个对象没有 ID，位置、尺寸与样式调整不会写回");
+  return out;
+}
 function ToolButton({
   icon,
   title,
@@ -360,6 +372,15 @@ export default function App() {
           <span className="document-name" title={name}>
             {name}
           </span>
+          {state.source && (
+            <span
+              className="hb-source"
+              title="这是 handbook-designer 导出的编辑包。下载修改后的 HTML 交回，即可写回手册源文件。"
+            >
+              基于构建 {state.source.build}
+              {state.source.lang ? ` · ${state.source.lang}` : ""}
+            </span>
+          )}
           <span className="save-state">
             <span
               className={
@@ -687,6 +708,12 @@ export default function App() {
                     {selection.image ? "所选图片" : "所选对象"}
                   </span>
                   <p>{selection.label}</p>
+                  {state.source && untraceable(selection).length > 0 && (
+                    <p className="hb-untraceable" role="note">
+                      {untraceable(selection).join("；")}
+                      ：这些修改只保存在当前 HTML 里，写回手册源文件时会被列为“未写回”。
+                    </p>
+                  )}
                   <button
                     className="text-button"
                     onClick={() => command("reset")}

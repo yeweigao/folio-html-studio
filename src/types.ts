@@ -7,6 +7,9 @@ export type PageInfo = {
 };
 export type Selection = {
   id: string;
+  sourceId: string | null;
+  editId: string | null;
+  traceable: { text: boolean; style: boolean; image: boolean };
   label: string;
   tag: string;
   text: string;
@@ -44,7 +47,9 @@ export type Selection = {
     color: string;
   } | null;
 };
+export type HandbookSource = { build: string; lang: string | null; title: string | null };
 export type EditorState = {
+  source: HandbookSource | null;
   pages: PageInfo[];
   page: number;
   selection: Selection | null;

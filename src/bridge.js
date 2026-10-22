@@ -629,6 +629,10 @@
       cs = getComputedStyle(selected);
     return {
       ...describe(selected),
+      sourceId:
+        selected.closest("[data-source-id]")?.getAttribute("data-source-id") || null,
+      editId: selected.closest("[data-edit-id]")?.getAttribute("data-edit-id") || null,
+      traceable: traceability(selected),
       text: selected.textContent,
       image: selected.tagName === "IMG" || cs.backgroundImage !== "none",
       x: Math.round(r.left - p.left),
@@ -706,9 +710,29 @@
       });
     return n;
   };
+  // handbook-designer 编辑包：读取构建标记；判断所选对象能否按 ID 写回手册源文件。
+  const hbSource = () => {
+    const meta = (name) =>
+      document.querySelector(`meta[name="${name}"]`)?.getAttribute("content") || null;
+    const build = meta("hb-build");
+    return build ? { build, lang: meta("hb-lang"), title: meta("hb-title") } : null;
+  };
+  const traceability = (el) => {
+    const styleTarget = el.matches("[data-edit-id],[data-source-id],.page");
+    const texts = [];
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode())
+      if (n.textContent.trim()) texts.push(n);
+    const text =
+      texts.length === 0 ||
+      texts.every((n) => n.parentElement.closest("[data-source-id]"));
+    const image = el.tagName !== "IMG" || el.hasAttribute("data-edit-id");
+    return { text, style: styleTarget, image };
+  };
   const emitState = () =>
     send("state", {
       state: {
+        source: hbSource(),
         pages: pageInfo(),
         page: pageIndex,
         selection: selectionInfo(),

@@ -1505,3 +1505,25 @@ input[type="color"] {
   white-space: nowrap;
   flex-shrink: 0;
 }
+
+/* handbook-designer 编辑包 */
+.hb-source {
+  align-self: flex-start;
+  width: fit-content;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border: 1px solid #dfe5ee;
+  border-radius: 999px;
+  color: #68758a;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.hb-untraceable {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fff6e5;
+  color: #7a4b00;
+  font-size: 12px;
+  line-height: 1.5;
+}

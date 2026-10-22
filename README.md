@@ -63,11 +63,21 @@ FOLIO_TEST_HTML=/absolute/path/to/handbook.html npm test
 
 测试自行启动 Vite，默认使用 Chromium。测试截图及临时下载保存在忽略的 `.qa/` 下，不把客户素材加入项目。
 
+## 与 handbook-designer 联动
+
+handbook-designer 用 `node hb/core/cli.mjs folio-pack <项目>` 导出编辑包（单文件 HTML，带 `hb-build` / `hb-lang` 构建标记）。在这里导入后：
+
+- 顶栏显示「基于构建 xxx · 语言」；
+- 选中没有内容 ID / 编辑 ID 的对象时，右侧提示哪些修改不会写回手册源文件；
+- 修改完照常「下载 HTML」，交回后由 `node hb/core/cli.mjs folio-sync <项目> <下载的 HTML>` 写回作者源（改字、换图、位置与样式；源文件在导出后被改过的地方报冲突，不覆盖）。
+
+文件仍只在浏览器本地处理，不上传服务器。
+
 ## 当前边界
 
 优先面向固定画布和 `handbook-designer-skill` 生成的 HTML，并不是任意网页的无损转换器。
 
-- 修改保存到 HTML；当前不回写 `book.yaml`。
+- 修改保存到 HTML；手册源文件的写回由 handbook-designer 的 `folio-sync` 完成（见上节）。
 - 拖动调整使用持久样式覆盖；大幅增加正文后仍应检查相邻内容，不会自动重新分页。
 - 多选组合、跨页联合编辑、增加/删除页面、多人协作及服务器生成 PDF 尚未实现。
 - ZIP 有多个 HTML 时优先选 `book.html`，再选 `index.html`；可单独打包其他 HTML。
